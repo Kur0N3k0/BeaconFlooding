@@ -16,7 +16,6 @@ void usage();
 
 thread *BeaconFlooding(const char *dev, const char *mac, const char *ssid, uint32_t channel);
 void BeaconFloodingR(const char *dev, Dot11Beacon::address_type mac, char *ssid, uint32_t channel);
-thread *ProbeResponse();
 
 bool setSignal(uint32_t sig, sighandler_t handler);
 void SignalHandler(int signo);
@@ -80,12 +79,6 @@ void BeaconFloodingR(const char *dev, Dot11Beacon::address_type mac, char *ssid,
 		sender.send(packet, dev);
 		this_thread::sleep_for(chrono::milliseconds(100));
 	}
-}
-
-thread *ProbeResponse(){
-	Dot11ProbeResponse probe;
-
-	return nullptr;
 }
 
 bool setSignal(uint32_t sig, sighandler_t handler){
