@@ -5,4 +5,4 @@ all:
 	$(CC) -o flooding flooding.cpp $(OPTIONS)
 
 clean:
-	rm flooding
+	rm flooding monitor.sh

