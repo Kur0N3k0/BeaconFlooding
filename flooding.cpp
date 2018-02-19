@@ -117,8 +117,8 @@ void BeaconFloodingR(const char *dev, MgtFrame<Type> *frame, uint32_t cnt){
 			RadioTap packet = RadioTap() / beacon;
 
 			sender.send(packet, dev);
-			this_thread::sleep_for(chrono::milliseconds(100));
 		}
+		this_thread::sleep_for(chrono::milliseconds(100));
 	}
 }
 
